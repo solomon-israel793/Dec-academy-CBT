@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dec Academic CBT Hub</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="icon" href="logo1.png">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+
+<!-- ☰ HAMBURGER MENU -->
+<div id="menuOverlay" class="menu-overlay"></div>
+<div id="sideMenu" class="side-menu">
+    <button class="close-menu" onclick="toggleMenu()">×</button>
+    <div class="menu-profile">
+        <img id="menuPic" src="" alt="Profile">
+        <h3 id="menuFirstname"></h3>
+        <p id="menuMatric"></p>
+        <p id="menuDept"></p>
+        <p id="menuSchool"></p>
+    </div>
+    <nav class="menu-nav">
+        <a href="#iq">📊 IQ Grade</a>
+        <a href="#performance">📈 Performance</a>
+        <a href="#subjects">📚 Subjects</a>
+        <a href="#time">⏱️ Time Management</a>
+        <a href="#history">📜 Exam History</a>
+    </nav>
+    <div class="menu-section">
+        <h4>📘 Add Official Course</h4>
+        <input type="text" id="newCourseName" placeholder="Select Course" list="allCourses">
+        <datalist id="allCourses">
+            <option value="MTS-102">
+            <option value="MTS-104">
+            <option value="GNS-102">
+            <option value="CHE-102">
+            <option value="PHY-102">
+            <option value="GST-112">
+            <option value="MEE-102">
+            <option value="GET-102">
+            <option value="FCPE-102">
+            <option value="CSC-102">
+            <option value="CHE-TUTORIAL">
+        </datalist>
+        <button onclick="addNewCourse()">+ Add</button>
+
+        <h4 style="margin-top:1rem;">❌ Remove Course</h4>
+        <select id="removeCourseList"></select>
+        <button onclick="removeCourse()">− Remove</button>
+    </div>
+    <div class="menu-section">
+        <h4>⚙️ Settings</h4>
+        <label>Theme:</label>
+        <select id="themeSwitch">
+            <option value="light">Light</option>
+            <option value="dark">Dark</option>
+        </select>
+        <label>Font Size:</label>
+        <select id="fontSize">
+            <option value="small">Small</option>
+            <option value="medium" selected>Medium</option>
+            <option value="large">Large</option>
+        </select>
+    </div>
+    <button class="logout-btn" onclick="logout()">🚪 Logout</button>
+
+    <div class="menu-footer">
+        <p>© DEC-DEV 2026</p>
+        <p>This website is developed by Solomon Israel</p>
+    </div>
+</div>
+
+<!-- 📝 AUTH SECTION -->
+<div id="authSection" class="auth-container">
+    <div class="auth-tabs">
+        <button class="tab-btn active" onclick="showTab('login')">Login</button>
+        <button class="tab-btn" onclick="showTab('signup')">Sign Up</button>
+        <button class="tab-btn" onclick="showTab('reset')">Reset Password</button>
+    </div>
+
+    <!-- LOGIN -->
+    <div id="loginTab" class="auth-card active-tab">
+        <h2>Welcome Back 🧠</h2><br>
+        <h3 class="dec">DEC ACADEMIC CBT PORTAL</h3><br>
+        <input type="text" id="loginMatric" placeholder="Matriculation Number" required>
+        
+        <div class="password-field">
+            <input type="password" id="loginPass" placeholder="Password" required>
+            <span class="toggle-pass" onclick="togglePassword('loginPass')">👁️</span>
+        </div>
+
+        <button onclick="loginUser()">Login</button>
+        <p class="forgot-link">
+            <a href="#" onclick="showTab('reset'); return false;">Forgot Password?</a>
+        </p>
+    </div>
+
+    <!-- SIGNUP -->
+    <div id="signupTab" class="auth-card">
+        <h2>Create Account ✍️</h2>
+        <input type="text" id="surname" placeholder="Surname" required>
+        <input type="text" id="firstname" placeholder="First Name" required>
+        <input type="text" id="matric" placeholder="Matriculation Number" required>
+        
+        <div class="password-field">
+            <input type="password" id="password" placeholder="Create Password" required>
+            <span class="toggle-pass" onclick="togglePassword('password')">👁️</span>
+        </div>
+
+        <input type="text" id="department" placeholder="Department" required>
+        <input type="text" id="school" placeholder="School / Faculty" required>
+
+        <!-- SECURITY QUESTION -->
+        <h4>Security Question (for password recovery)</h4>
+        <select id="secQuestion" required>
+            <option value="">-- Select Question --</option>
+            <option value="color">What is your favorite color?</option>
+            <option value="food">What is your favorite food?</option>
+            <option value="town">Which town were you born in?</option>
+            <option value="pet">What was the name of your first pet?</option>
+        </select>
+        <input type="text" id="secAnswer" placeholder="Your Answer" required>
+
+        <label>Profile Picture:</label>
+        <input type="file" id="profilePic" accept="image/*" required>
+
+        <h4>Select Courses to Offer:</h4>
+        <input type="text" id="selectedCourses" placeholder="Choose Courses" list="allCourses" required>
+        <small style="opacity:.7;display:block;margin:.3rem 0;">Type/select from official list</small>
+
+        <button onclick="signupUser()">Register & Continue</button>
+    </div>
+
+    <!-- PASSWORD RESET -->
+    <div id="resetTab" class="auth-card">
+        <h2>Reset Password 🔑</h2>
+        <input type="text" id="resetMatric" placeholder="Enter your Matric Number" required>
+        <div id="secArea" style="display:none;">
+            <p id="qDisplay"></p>
+            <input type="text" id="resetAnswer" placeholder="Enter your answer" required>
+            <div class="password-field">
+                <input type="password" id="newPass" placeholder="New Password" required>
+                <span class="toggle-pass" onclick="togglePassword('newPass')">👁️</span>
+            </div>
+        </div>
+        <button onclick="checkSecurity()" id="resetBtn">Continue</button>
+    </div>
+</div>
+
+<!-- 📊 DASHBOARD -->
+<div id="dashboard" class="dashboard-container" style="display: none;">
+    <header id="mainHeader" class="header">
+        <div class="header-content">
+            <button class="hamburger" onclick="toggleMenu()">☰</button>
+            <img id="dashPic" src="" alt="Profile">
+            <div class="user-info">
+                <h3 id="dashFirstname"></h3>
+                <p id="dashMatric"></p>
+            </div>                
+            <div class="headdy">
+                <img src="logo.png" alt="logo" width="100">
+            </div>
+        </div>
+    </header>
+
+    <main class="main-content">
+        <h1 id="greeting" class="greeting"></h1>
+
+        <div class="stats-grid">
+            <div class="stat-card" id="iq">
+                <h3>📊 IQ Grade</h3>
+                <p id="iqGrade">--</p>
+            </div>
+            <div class="stat-card" id="time">
+                <h3>⏱️ Time Management</h3>
+                <p id="timeMgmt">--%</p>
+            </div>
+            <div class="stat-card">
+                <h3>📈 Avg Score (n/30)</h3>
+                <p id="avgScore">--%</p>
+            </div>
+        </div>
+
+        <div class="chart-container" id="performance">
+            <h2>Performance Trend 📈</h2>
+            <canvas id="performanceChart"></canvas>
+        </div>
+
+        <h2 id="subjects">📚 Available Courses / Take Exam</h2>
+        <div class="subjects-grid" id="subjectsList"></div>
+
+        <h2 id="history">📜 Exam History & Corrections</h2>
+        <div id="examHistory" class="history-list"></div>
+    </main>
+</div>
+
+<script src="app.js"></script>
+</body>
+</html>
