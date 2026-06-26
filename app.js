@@ -14,10 +14,48 @@ const officialCourses = [
 ];
 let currentUser = null;
 
+// --- ✅ STORAGE HELPER — PREVENT QUOTA ERRORS ---
+function safeSave(key, valueObj) {
+    try {
+        const jsonStr = JSON.stringify(valueObj);
+        localStorage.setItem(key, jsonStr);
+        return true;
+    } catch (err) {
+        if (err.name === "QuotaExceededError") {
+            alert("⚠️ Storage FULL! Please clear old history or use fewer large files.");
+            console.error("STORAGE QUOTA FULL:", err);
+            return false;
+        }
+        alert("❌ Save error: " + err.message);
+        return false;
+    }
+}
+
+// --- ✅ COMPRESS PROFILE IMAGE — REDUCES SIZE BY 70–90% ---
+function compressImage(file, maxWidth = 120, quality = 0.6, callback) {
+    const reader = new FileReader();
+    reader.onload = function (e) {
+        const img = new Image();
+        img.onload = function () {
+            const canvas = document.createElement("canvas");
+            // Small fixed size — enough for profile display
+            canvas.width = maxWidth;
+            canvas.height = maxWidth;
+            const ctx = canvas.getContext("2d");
+            ctx.drawImage(img, 0, 0, maxWidth, maxWidth);
+            // Return smaller Base64 string
+            const smallData = canvas.toDataURL("image/jpeg", quality);
+            callback(smallData);
+        };
+        img.src = e.target.result;
+    };
+    reader.readAsDataURL(file);
+}
+
 // --- TOGGLE PASSWORD VISIBILITY ---
 function togglePassword(fieldId) {
     const field = document.getElementById(fieldId);
-    field.type = field.type === "password" ? "text" : "password";
+    if (field) field.type = field.type === "password" ? "text" : "password";
 }
 
 // --- THEME & FONT ---
@@ -47,76 +85,106 @@ function setGreeting() {
     if(el) el.textContent = `${g}, GENIUS 🧠`;
 }
 
-// --- AUTH ---
+// --- AUTH NAVIGATION ---
 function showTab(n) {
+    if (!event || !event.target) return;
     document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
     document.querySelectorAll('.auth-card').forEach(c=>c.classList.remove('active-tab'));
     event.target.classList.add('active');
-    document.getElementById(n+'Tab').classList.add('active-tab');
+    const tabEl = document.getElementById(n+'Tab');
+    if(tabEl) tabEl.classList.add('active-tab');
 }
 
 function getCourseObj(name) {
     return officialCourses.find(c=>c.name.toLowerCase()===name.trim().toLowerCase());
 }
 
+// --- SIGNUP — NOW WITH COMPRESSED IMAGE ---
 function signupUser() {
-    const matric = document.getElementById("matric").value.trim();
-    const pass = document.getElementById("password").value;
-    const secQ = document.getElementById("secQuestion").value;
-    const secA = document.getElementById("secAnswer").value.trim().toLowerCase();
-    const dept = document.getElementById("department").value.trim();
-    const school = document.getElementById("school").value.trim();
-    const users = JSON.parse(localStorage.getItem("cbtAllUsers")||"[]");
-    if(users.find(u=>u.matric===matric)) return alert("Matriculation number already registered!");
-    if(!secQ || !secA) return alert("Please select and answer your security question!");
+    const matric = document.getElementById("matric")?.value.trim() || "";
+    const pass = document.getElementById("password")?.value || "";
+    const secQ = document.getElementById("secQuestion")?.value || "";
+    const secA = document.getElementById("secAnswer")?.value.trim().toLowerCase() || "";
+    const dept = document.getElementById("department")?.value.trim() || "";
+    const school = document.getElementById("school")?.value.trim() || "";
 
-    const inputCourses = document.getElementById("selectedCourses").value.split(',').map(s=>s.trim()).filter(Boolean);
+    const users = JSON.parse(localStorage.getItem("cbtalluser")||"[]");
+    if(users.find(u=>u.matric===matric)) return alert("❌ Matriculation number already registered!");
+    if(!secQ || !secA) return alert("⚠️ Please select and answer your security question!");
+
+    const inputCourses = (document.getElementById("selectedCourses")?.value || "")
+        .split(',').map(s=>s.trim()).filter(Boolean);
     const selected = [];
     for(const nm of inputCourses) {
         const c = getCourseObj(nm);
         if(c) selected.push(c);
-        else alert(`"${nm}" is NOT an official course — skipped`);
+        else alert(`⚠️ "${nm}" is NOT an official course — skipped`);
     }
-    if(!selected.length) return alert("Select at least ONE valid official course!");
+    if(!selected.length) return alert("⚠️ Select at least ONE valid official course!");
 
-    const picFile = document.getElementById("profilePic").files[0];
-    if(!picFile) return alert("Upload profile picture!");
+    const picFile = document.getElementById("profilePic")?.files[0];
+    if(!picFile) return alert("⚠️ Upload profile picture!");
 
-    const reader = new FileReader();
-    reader.onload = e=>{
+    // ✅ USE COMPRESSION BEFORE SAVING
+    compressImage(picFile, 110, 0.55, function(smallPicData){
         const newUser = {
-            surname: document.getElementById("surname").value.trim(),
-            firstname: document.getElementById("firstname").value.trim(),
-            matric, password: pass,
-            secQuestion: secQ, secAnswer: secA,
-            department: dept, school: school,
-            profilePic: e.target.result, courses: selected, exams: []
+            surname: document.getElementById("surname")?.value.trim() || "",
+            firstname: document.getElementById("firstname")?.value.trim() || "",
+            matric, 
+            password: pass,
+            secQuestion: secQ, 
+            secAnswer: secA,
+            department: dept, 
+            school: school,
+            profilePic: smallPicData, // ✅ MUCH SMALLER
+            courses: selected, 
+            exams: [] // ✅ Limit history later if needed
         };
+
         users.push(newUser);
-        localStorage.setItem("cbtAllUsers", JSON.stringify(users));
-        alert("Account created successfully! Login now.");
+        if(!safeSave("cbtalluser", users)) {
+            alert("❌ Could not save account — storage full!");
+            return;
+        }
+        alert("✅ Account created successfully! Login now.");
         showTab('login');
-    };
-    reader.readAsDataURL(picFile);
+    });
 }
 
+// --- LOGIN ---
 function loginUser() {
-    const matric = document.getElementById("loginMatric").value.trim();
-    const pass = document.getElementById("loginPass").value;
-    const users = JSON.parse(localStorage.getItem("cbtAllUsers")||"[]");
-    const found = users.find(u=>u.matric===matric&&u.password===pass);
-    if(!found) return alert("Invalid login details!");
+    const matric = document.getElementById("loginMatric")?.value.trim() || "";
+    const pass = document.getElementById("loginPass")?.value || "";
+
+    if(!matric || !pass) return alert("⚠️ Fill both Matric Number and Password!");
+
+    const users = JSON.parse(localStorage.getItem("cbtalluser")||"[]");
+    const found = users.find(u=>u.matric === matric && u.password === pass);
+
+    if(!found) return alert("❌ Invalid Matric Number or Password!");
+
     currentUser = found;
-    localStorage.setItem("cbtActive", JSON.stringify({matric}));
+    safeSave("cbtActive", { matric: matric, loggedIn: true });
+    alert("✅ Login successful — Welcome back!");
     loadDashboard();
+}
+
+// --- AUTO‑RESTORE SESSION ---
+function restoreSession() {
+    const saved = JSON.parse(localStorage.getItem("cbtActive") || "null");
+    if(saved && saved.matric) {
+        const allUsers = JSON.parse(localStorage.getItem("cbtalluser")||"[]");
+        currentUser = allUsers.find(u => u.matric === saved.matric);
+        if(currentUser) loadDashboard();
+    }
 }
 
 // --- PASSWORD RECOVERY ---
 function checkSecurity() {
-    const matric = document.getElementById("resetMatric").value.trim();
-    const users = JSON.parse(localStorage.getItem("cbtAllUsers")||"[]");
+    const matric = document.getElementById("resetMatric")?.value.trim() || "";
+    const users = JSON.parse(localStorage.getItem("cbtalluser")||"[]");
     const user = users.find(u=>u.matric===matric);
-    if(!user) return alert("Matric number not found!");
+    if(!user) return alert("❌ Matric number not found!");
 
     const qMap = {
         color: "What is your favorite color?",
@@ -124,30 +192,39 @@ function checkSecurity() {
         town: "Which town were you born in?",
         pet: "What was the name of your first pet?"
     };
-    document.getElementById("qDisplay").textContent = qMap[user.secQuestion];
-    document.getElementById("secArea").style.display = "block";
-    document.getElementById("resetBtn").onclick = () => resetPassword(user);
-    document.getElementById("resetBtn").textContent = "Reset Password";
+    const qEl = document.getElementById("qDisplay");
+    const secArea = document.getElementById("secArea");
+    const resetBtn = document.getElementById("resetBtn");
+
+    if(qEl) qEl.textContent = qMap[user.secQuestion] || "Answer your security question";
+    if(secArea) secArea.style.display = "block";
+    if(resetBtn) {
+        resetBtn.onclick = () => resetPassword(user);
+        resetBtn.textContent = "Reset Password";
+    }
 }
 
 function resetPassword(user) {
-    const ans = document.getElementById("resetAnswer").value.trim().toLowerCase();
-    const newPass = document.getElementById("newPass").value;
-    if(ans !== user.secAnswer) return alert("Wrong answer! Cannot reset password.");
-    if(!newPass) return alert("Enter new password!");
+    const ans = document.getElementById("resetAnswer")?.value.trim().toLowerCase() || "";
+    const newPass = document.getElementById("newPass")?.value || "";
+    
+    if(ans !== user.secAnswer) return alert("❌ Wrong answer! Cannot reset password.");
+    if(!newPass) return alert("⚠️ Enter new password!");
 
-    const all = JSON.parse(localStorage.getItem("cbtAllUsers"));
+    const all = JSON.parse(localStorage.getItem("cbtalluser"));
     const idx = all.findIndex(u=>u.matric===user.matric);
-    all[idx].password = newPass;
-    localStorage.setItem("cbtAllUsers", JSON.stringify(all));
-    alert("Password reset successfully! You can now login.");
-    showTab('login');
+    if(idx !== -1) {
+        all[idx].password = newPass;
+        safeSave("cbtalluser", all);
+        alert("✅ Password reset successfully! Login now.");
+        showTab('login');
+    }
 }
 
 // --- COURSE MANAGEMENT ---
 function updateCourseLists() {
     const remSel = document.getElementById("removeCourseList");
-    if(!remSel) return;
+    if(!remSel || !currentUser) return;
     remSel.innerHTML = "";
     currentUser.courses.forEach(c=>{
         const opt = document.createElement("option");
@@ -156,45 +233,64 @@ function updateCourseLists() {
     });
 }
 function addNewCourse() {
-    const nm = document.getElementById("newCourseName").value.trim();
+    if(!currentUser) return;
+    const nm = document.getElementById("newCourseName")?.value.trim() || "";
     if(!nm) return;
     const c = getCourseObj(nm);
     if(!c) return alert("⚠️ Only official courses allowed — check spelling!");
-    if(currentUser.courses.some(x=>x.id===c.id)) return alert("Course already added!");
+    if(currentUser.courses.some(x=>x.id===c.id)) return alert("ℹ️ Course already added!");
     currentUser.courses.push(c);
-    saveCurrentUser(); updateCourseLists(); renderSubjects();
-    document.getElementById("newCourseName").value="";
+    saveCurrentUser(); 
+    updateCourseLists(); 
+    renderSubjects();
+    if(document.getElementById("newCourseName")) document.getElementById("newCourseName").value="";
 }
 function removeCourse() {
+    if(!currentUser) return;
     const sel = document.getElementById("removeCourseList");
     if(!sel) return;
     const id = sel.value;
     currentUser.courses = currentUser.courses.filter(c=>c.id!==id);
-    saveCurrentUser(); updateCourseLists(); renderSubjects();
+    saveCurrentUser(); 
+    updateCourseLists(); 
+    renderSubjects();
 }
 function saveCurrentUser() {
-    const all = JSON.parse(localStorage.getItem("cbtAllUsers"));
+    if(!currentUser) return;
+    const all = JSON.parse(localStorage.getItem("cbtalluser"));
     const idx = all.findIndex(u=>u.matric===currentUser.matric);
-    if(idx!==-1) {all[idx] = currentUser; localStorage.setItem("cbtAllUsers", JSON.stringify(all));}
+    if(idx!==-1) {
+        all[idx] = currentUser; 
+        safeSave("cbtalluser", all); // ✅ SAFE SAVE
+    }
 }
 
 // --- DASHBOARD ---
 function loadDashboard() {
-    applySettings(); setGreeting();
-    document.getElementById("authSection").style.display="none";
-    document.getElementById("dashboard").style.display="block";
+    applySettings(); 
+    setGreeting();
+    
+    const authSec = document.getElementById("authSection");
+    const dashSec = document.getElementById("dashboard");
+    if(authSec) authSec.style.display = "none";
+    if(dashSec) dashSec.style.display = "block";
 
-    document.getElementById("dashPic").src = currentUser.profilePic;
-    document.getElementById("dashFirstname").textContent = currentUser.firstname;
-    document.getElementById("dashMatric").textContent = currentUser.matric;
-    document.getElementById("menuPic").src = currentUser.profilePic;
-    document.getElementById("menuFirstname").textContent = currentUser.firstname;
-    document.getElementById("menuMatric").textContent = currentUser.matric;
-    document.getElementById("menuDept").textContent = `Dept: ${currentUser.department}`;
-    document.getElementById("menuSchool").textContent = `School: ${currentUser.school}`;
+    if(document.getElementById("dashPic")) document.getElementById("dashPic").src = currentUser.profilePic;
+    if(document.getElementById("dashFirstname")) document.getElementById("dashFirstname").textContent = currentUser.firstname;
+    if(document.getElementById("dashMatric")) document.getElementById("dashMatric").textContent = currentUser.matric;
+    if(document.getElementById("menuPic")) document.getElementById("menuPic").src = currentUser.profilePic;
+    if(document.getElementById("menuFirstname")) document.getElementById("menuFirstname").textContent = currentUser.firstname;
+    if(document.getElementById("menuMatric")) document.getElementById("menuMatric").textContent = currentUser.matric;
+    if(document.getElementById("menuDept")) document.getElementById("menuDept").textContent = `Dept: ${currentUser.department}`;
+    if(document.getElementById("menuSchool")) document.getElementById("menuSchool").textContent = `School: ${currentUser.school}`;
 
-    updateCourseLists(); renderSubjects(); updateStats(); renderHistory(); drawChart();
+    updateCourseLists(); 
+    renderSubjects(); 
+    updateStats(); 
+    renderHistory(); 
+    drawChart();
 }
+
 function renderSubjects() {
     const list = document.getElementById("subjectsList");
     if(!list) return;
@@ -210,6 +306,7 @@ function renderSubjects() {
         list.appendChild(btn);
     });
 }
+
 function updateStats() {
     const scores = currentUser.exams.map(e=>e.score);
     const avg = scores.length?Math.round(scores.reduce((a,b)=>a+b,0)/scores.length):0;
@@ -221,13 +318,15 @@ function updateStats() {
     else iq="Needs Improvement";
     const onTime = currentUser.exams.filter(e=>e.timeLeft>0).length;
     const timePct = currentUser.exams.length?Math.round((onTime/currentUser.exams.length)*100):0;
-    document.getElementById("avgScore").textContent=`${avg}%`;
-    document.getElementById("iqGrade").textContent=iq;
-    document.getElementById("timeMgmt").textContent=`${timePct}%`;
+    
+    if(document.getElementById("avgScore")) document.getElementById("avgScore").textContent=`${avg}%`;
+    if(document.getElementById("iqGrade")) document.getElementById("iqGrade").textContent=iq;
+    if(document.getElementById("timeMgmt")) document.getElementById("timeMgmt").textContent=`${timePct}%`;
 }
+
 function drawChart() {
     const canv = document.getElementById("performanceChart");
-    if(!canv) return;
+    if(!canv || typeof Chart === "undefined") return;
     const ctx = canv.getContext("2d");
     const labels = currentUser.exams.map(e=>new Date(e.date).toLocaleDateString());
     const scores = currentUser.exams.map(e=>Math.round(e.score/30*100));
@@ -240,11 +339,14 @@ function drawChart() {
         }]}
     });
 }
+
 function renderHistory() {
     const hist=document.getElementById("examHistory");
     if(!hist) return;
     hist.innerHTML="";
-    currentUser.exams.forEach((e,i)=>{
+    // ✅ Optional: Keep only last 15 exams to save space
+    const recentExams = currentUser.exams.slice(-15);
+    recentExams.forEach((e,i)=>{
         const pct=Math.round(e.score/30*100);
         const card=document.createElement("div");
         card.className="history-card";
@@ -253,22 +355,21 @@ function renderHistory() {
                 <h4>${e.subject} — ${e.date}</h4>
                 <p>Score: <strong>${e.score}/30 (${pct}%)</strong> | Time Left: ${e.timeLeft} mins</p>
             </div>
-            <button onclick="viewCorrections(${i})">📖 Review</button>
+            <button onclick="viewCorrections(${currentUser.exams.indexOf(e)})">📖 Review</button>
         `;
         hist.appendChild(card);
     });
 }
 
-// ✅ UPDATED FUNCTION — SHOWS ALL OPTIONS + STYLES CORRECT/WRONG
 function viewCorrections(idx) {
     const exam = currentUser.exams[idx];
+    if(!exam) return;
     let html = `<h2 style="margin-bottom:1.5rem">📝 Corrections — ${exam.subject}</h2>`;
 
     exam.questions.forEach((q, qi) => {
-        const ua = exam.userAnswers[qi];
+        const ua = exam.userAnswers?.[qi] || "";
         const ok = ua === q.answer;
 
-        // Build options list, highlight correct & user choice
         let optionsHtml = "";
         if (q.options && Array.isArray(q.options)) {
             optionsHtml = `<div style="margin:.6rem 0; padding-left:.5rem;">`;
@@ -289,7 +390,7 @@ function viewCorrections(idx) {
                 ${optionsHtml || "<em>No options available</em>"}
                 <p>Your Answer: ${ua || '—'}</p>
                 <p>Correct Answer: <strong>${q.answer}</strong></p>
-                <p style="font-style:italic;margin-top:.5rem">📌 ${q.explanation}</p>
+                <p style="font-style:italic;margin-top:.5rem">📌 ${q.explanation || "No explanation provided"}</p>
             </div>
         `;
     });
@@ -305,10 +406,12 @@ function viewCorrections(idx) {
     win.document.close();
 }
 
-// --- MENU & SCROLL ---
+// --- MENU & UI ---
 function toggleMenu() {
-    document.getElementById("sideMenu").classList.toggle("open");
-    document.getElementById("menuOverlay").classList.toggle("show");
+    const side = document.getElementById("sideMenu");
+    const overlay = document.getElementById("menuOverlay");
+    if(side) side.classList.toggle("open");
+    if(overlay) overlay.classList.toggle("show");
 }
 window.addEventListener("scroll",()=>{
     const h=document.getElementById("mainHeader");
@@ -317,16 +420,15 @@ window.addEventListener("scroll",()=>{
         else h.classList.remove("scrolled");
     }
 });
+
 function logout() {
-    currentUser=null; localStorage.removeItem("cbtActive"); location.reload();
+    currentUser = null; 
+    localStorage.removeItem("cbtActive"); 
+    location.reload();
 }
 
+// --- START APP ---
 window.addEventListener("DOMContentLoaded",()=>{
     applySettings();
-    const saved=JSON.parse(localStorage.getItem("cbtActive")||"null");
-    if(saved){
-        const all=JSON.parse(localStorage.getItem("cbtAllUsers")||"[]");
-        currentUser=all.find(u=>u.matric===saved.matric);
-        if(currentUser)loadDashboard();
-    }
+    restoreSession();
 });
